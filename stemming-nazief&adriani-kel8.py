@@ -4,24 +4,10 @@ import pandas as pd
 import re
 from collections import Counter
 
-# %%
-def tokenizing(input):
-    input = input.replace(".", "")
-    input = input.replace(",", "")
-    input = input.replace(":", "")
-    input = input.replace("-", " ")
-    input = input.replace("?", "")
-    input = input.replace("!", "")
-    input = input.replace("(", "")
-    input = input.replace(")", "")
-    input = input.replace("[", "")
-    input = input.replace("]", "")
-    input = input.replace("{", "")
-    input = input.replace("}", "")
-    input = input.replace("'", "")
-    input = input.replace('"', "")
-    input = input.replace("/", "")
-    return input
+# %% Tokenizing
+def tokenizing(text):
+    text = re.sub(r'[^\w\s]', ' ', text)  # Ganti semua tanda baca dengan spasi
+    return text
 
 #%% Stopword
 def stop_word(word):
@@ -31,7 +17,7 @@ def stop_word(word):
         return word
     return None
 
-#%% Load dictionary (kata dasar)
+#%% LKamus Kata Dasar
 AKAR_KATA = []
 kamus_clean = []
 def load_dictionary():
@@ -55,9 +41,8 @@ def kamus_word(word):
         return None
     return word
 
-#%% Stemming functions
+#%% Stemming 
 def hapus_infleksional_suffiks(word):
-    """Remove inflectional suffixes"""
     # akhiran -lah, -kah, -nya, -tah, -pun
     if word.endswith('lah') or word.endswith('kah') or word.endswith('nya') or word.endswith('tah') or word.endswith('pun'):
         word = word[0:len(word) - 3]
@@ -73,7 +58,6 @@ def hapus_infleksional_suffiks(word):
     return word
 
 def hapus_derivation_suffiks(word):
-    """Remove derivational suffixes"""
     # akhiran kan
     if word.endswith('kan'):
         word = word[0:len(word) - 3]
@@ -249,22 +233,16 @@ def hapus_derivation_prefiks(word):
     
     return word
 
-#%% Metrics calculation
+#%% Matriks Evaluasi
 def calculate_metrics(all_words, stemmed_words):
-    # Count total words
     total_words = len(all_words)
-    
-    # Count unique words
     unique_words = len(set(all_words))
-    
-    # Calculate UI (User Interface)
     UI = unique_words / total_words if total_words > 0 else 0
     
-    # Calculate OI (Object Identification)
+
     recognized_words = len(stemmed_words)
     OI = recognized_words / unique_words if unique_words > 0 else 0
     
-    # Calculate MWC (Modified Word Count)
     MWC = unique_words + recognized_words
     
     return {
@@ -277,19 +255,15 @@ def calculate_metrics(all_words, stemmed_words):
     }
 
 #%% MAIN
-# Load data
 df = pd.read_excel('ArtikelBhsIndo.xlsx')
 words = ' '.join(df['Isi'].astype(str).tolist())
 
-# Lowercase and tokenize
 words = words.lower()
 words = tokenizing(words)
 
-# Split into words
 all_words = words.split()
 print(f'Jumlah kata awal : {len(all_words)}')
 
-# Apply stopword removal
 list_stop_words = []
 for w in all_words:
     word = stop_word(w)
@@ -297,13 +271,11 @@ for w in all_words:
         list_stop_words.append(word)
 print(f'Jumlah kata setelah stop word : {len(list_stop_words)}')
 
-# Direct dictionary check first
 for word in list_stop_words:
     if word in kamus_clean:
         if word not in AKAR_KATA:
             AKAR_KATA.append(word)
 
-# Process words not found in dictionary
 list_not_in_kamus_words = []
 for w in list_stop_words:
     if w not in kamus_clean:
@@ -312,7 +284,6 @@ for w in list_stop_words:
 print(f'Jumlah kata setelah kamus : {len(list_not_in_kamus_words)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Inflectional suffixes removal
 list_not_infleksional_suffiks = []
 for w in list_not_in_kamus_words:
     word = hapus_infleksional_suffiks(w)
@@ -322,7 +293,6 @@ for w in list_not_in_kamus_words:
 print(f'Jumlah kata setelah infleksional suffiks : {len(list_not_infleksional_suffiks)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Derivational suffixes removal
 list_not_derivation_suffiks = []
 for w in list_not_infleksional_suffiks:
     word = hapus_derivation_suffiks(w)
@@ -332,7 +302,6 @@ for w in list_not_infleksional_suffiks:
 print(f'Jumlah kata setelah derivation suffiks : {len(list_not_derivation_suffiks)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Derivational prefixes removal
 list_not_in_kamus = []
 for w in list_not_derivation_suffiks:
     word = hapus_derivation_prefiks(w)
@@ -342,7 +311,6 @@ for w in list_not_derivation_suffiks:
 print(f'Jumlah kata setelah derivation prefiks : {len(list_not_in_kamus)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Final dictionary check for any missed words
 for w in list_not_in_kamus:
     if w in kamus_clean and w not in AKAR_KATA:
         AKAR_KATA.append(w)
@@ -351,7 +319,6 @@ print(f'Final akar kata : {len(AKAR_KATA)}')
 print(f'Kata yang tak ada di kamus: {len(list_not_in_kamus)}')
 print(f"Kata yang tidak ada dikamus: {list_not_in_kamus}")
 
-# Calculate UI, OI, and MWC metrics
 metrics = calculate_metrics(all_words, AKAR_KATA)
 print(f"UI (User Interface): {metrics['UI']:.4f}")
 print(f"OI (Object Identification): {metrics['OI']:.4f}")
