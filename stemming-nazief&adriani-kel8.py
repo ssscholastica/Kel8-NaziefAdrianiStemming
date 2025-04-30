@@ -233,27 +233,6 @@ def hapus_derivation_prefiks(word):
     
     return word
 
-#%% Matriks Evaluasi
-def calculate_metrics(all_words, stemmed_words):
-    total_words = len(all_words)
-    unique_words = len(set(all_words))
-    UI = unique_words / total_words if total_words > 0 else 0
-    
-
-    recognized_words = len(stemmed_words)
-    OI = recognized_words / unique_words if unique_words > 0 else 0
-    
-    MWC = unique_words + recognized_words
-    
-    return {
-        'UI': UI,
-        'OI': OI,
-        'MWC': MWC,
-        'total_words': total_words,
-        'unique_words': unique_words,
-        'recognized_words': recognized_words
-    }
-
 #%% MAIN
 df = pd.read_excel('ArtikelBhsIndo.xlsx')
 words = ' '.join(df['Isi'].astype(str).tolist())
@@ -319,10 +298,25 @@ print(f'Final akar kata : {len(AKAR_KATA)}')
 print(f'Kata yang tak ada di kamus: {len(list_not_in_kamus)}')
 print(f"Kata yang tidak ada dikamus: {list_not_in_kamus}")
 
-metrics = calculate_metrics(all_words, AKAR_KATA)
-print(f"UI (User Interface): {metrics['UI']:.4f}")
-print(f"OI (Object Identification): {metrics['OI']:.4f}")
-print(f"MWC (Modified Word Count): {metrics['MWC']}")
-print(f"Total Words: {metrics['total_words']}")
-print(f"Unique Words: {metrics['unique_words']}")
-print(f"Recognized Words: {metrics['recognized_words']}")
+#%% Membuat DataFrame untuk menyimpan hasil stemming
+import pandas as pd
+
+# Data untuk menyimpan kata awal dan kata stemming
+hasil_stemming = []
+
+# Proses stemming untuk setiap kata dan simpan hasilnya
+for w in list_not_in_kamus:
+    word = hapus_derivation_prefiks(w)
+    if word is not None:
+        hasil_stemming.append({'kata_awal': w, 'kata_stemming': word})
+
+# Membuat DataFrame dari hasil stemming
+df_stemming = pd.DataFrame(hasil_stemming)
+
+# Menyimpan DataFrame ke dalam file CSV
+df_stemming.to_csv('hasil_stemming.csv', index=False, encoding='utf-8')
+
+# Jika ingin menyimpan dalam format Excel
+# df_stemming.to_excel('hasil_stemming.xlsx', index=False, encoding='utf-8')
+
+print(f'Hasil stemming telah disimpan di: hasil_stemming.csv')
