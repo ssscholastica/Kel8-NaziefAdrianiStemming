@@ -2,10 +2,11 @@
 import numpy as np
 import pandas as pd
 import re
+from collections import Counter
 
-#%% Tokenizing
+# %% Tokenizing
 def tokenizing(text):
-    text = re.sub(r'[^\w\s]', ' ', text)
+    text = re.sub(r'[^\w\s]', ' ', text)  # Ganti semua tanda baca dengan spasi
     return text
 
 #%% Stopword
@@ -16,7 +17,7 @@ def stop_word(word):
         return word
     return None
 
-#%% Load dictionary (kata dasar)
+#%% LKamus Kata Dasar
 AKAR_KATA = []
 kamus_clean = []
 def load_dictionary():
@@ -40,7 +41,7 @@ def kamus_word(word):
         return None
     return word
 
-#%% Stemming functions
+#%% Stemming 
 def hapus_infleksional_suffiks(word):
     # akhiran -lah, -kah, -nya, -tah, -pun
     if word.endswith('lah') or word.endswith('kah') or word.endswith('nya') or word.endswith('tah') or word.endswith('pun'):
@@ -233,19 +234,15 @@ def hapus_derivation_prefiks(word):
     return word
 
 #%% MAIN
-# Load data
 df = pd.read_excel('ArtikelBhsIndo.xlsx')
 words = ' '.join(df['Isi'].astype(str).tolist())
 
-# Lowercase and tokenize
 words = words.lower()
 words = tokenizing(words)
 
-# Split into words
 all_words = words.split()
 print(f'Jumlah kata awal : {len(all_words)}')
 
-# Apply stopword removal
 list_stop_words = []
 for w in all_words:
     word = stop_word(w)
@@ -253,13 +250,11 @@ for w in all_words:
         list_stop_words.append(word)
 print(f'Jumlah kata setelah stop word : {len(list_stop_words)}')
 
-# Direct dictionary check first
 for word in list_stop_words:
     if word in kamus_clean:
         if word not in AKAR_KATA:
             AKAR_KATA.append(word)
 
-# Process words not found in dictionary
 list_not_in_kamus_words = []
 for w in list_stop_words:
     if w not in kamus_clean:
@@ -268,7 +263,6 @@ for w in list_stop_words:
 print(f'Jumlah kata setelah kamus : {len(list_not_in_kamus_words)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Inflectional suffixes removal
 list_not_infleksional_suffiks = []
 for w in list_not_in_kamus_words:
     word = hapus_infleksional_suffiks(w)
@@ -278,7 +272,6 @@ for w in list_not_in_kamus_words:
 print(f'Jumlah kata setelah infleksional suffiks : {len(list_not_infleksional_suffiks)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Derivational suffixes removal
 list_not_derivation_suffiks = []
 for w in list_not_infleksional_suffiks:
     word = hapus_derivation_suffiks(w)
@@ -288,7 +281,6 @@ for w in list_not_infleksional_suffiks:
 print(f'Jumlah kata setelah derivation suffiks : {len(list_not_derivation_suffiks)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Derivational prefixes removal
 list_not_in_kamus = []
 for w in list_not_derivation_suffiks:
     word = hapus_derivation_prefiks(w)
@@ -298,7 +290,6 @@ for w in list_not_derivation_suffiks:
 print(f'Jumlah kata setelah derivation prefiks : {len(list_not_in_kamus)}')
 print(f'Akar kata : {len(AKAR_KATA)}')
 
-# Final dictionary check for any missed words
 for w in list_not_in_kamus:
     if w in kamus_clean and w not in AKAR_KATA:
         AKAR_KATA.append(w)
@@ -307,42 +298,25 @@ print(f'Final akar kata : {len(AKAR_KATA)}')
 print(f'Kata yang tak ada di kamus: {len(list_not_in_kamus)}')
 print(f"Kata yang tidak ada dikamus: {list_not_in_kamus}")
 
-#%%
-df_akar_kata = pd.DataFrame({'Akar Kata': AKAR_KATA})
+#%% Membuat DataFrame untuk menyimpan hasil stemming
+import pandas as pd
 
-# Menyimpan ke file Excel
-output_filename = 'hasil_stemming.xlsx'
-df_akar_kata.to_excel(output_filename, index=False)
+# Data untuk menyimpan kata awal dan kata stemming
+hasil_stemming = []
 
-print(f"Hasil stemming telah disimpan di '{output_filename}'")
+# Proses stemming untuk setiap kata dan simpan hasilnya
+for w in list_not_in_kamus:
+    word = hapus_derivation_prefiks(w)
+    if word is not None:
+        hasil_stemming.append({'kata_awal': w, 'kata_stemming': word})
 
-# # Calculate UI, OI, and MWC metrics
-# metrics = calculate_metrics(all_words, AKAR_KATA)
-# print(f"UI (User Interface): {metrics['UI']:.4f}")
-# print(f"OI (Object Identification): {metrics['OI']:.4f}")
-# print(f"MWC (Modified Word Count): {metrics['MWC']}")
-# print(f"Total Words: {metrics['total_words']}")
-# print(f"Unique Words: {metrics['unique_words']}")
-# print(f"Recognized Words: {metrics['recognized_words']}")
+# Membuat DataFrame dari hasil stemming
+df_stemming = pd.DataFrame(hasil_stemming)
 
-#%% Ekstraksi kata sebelum stemming dan simpan sebagai golden standard
-from collections import Counter
+# Menyimpan DataFrame ke dalam file CSV
+df_stemming.to_csv('hasil_stemming.csv', index=False, encoding='utf-8')
 
-# Pecah teks menjadi kata-kata
-original_words = words.split()
+# Jika ingin menyimpan dalam format Excel
+# df_stemming.to_excel('hasil_stemming.xlsx', index=False, encoding='utf-8')
 
-# Hitung frekuensi setiap kata
-word_counts = Counter(original_words)
-
-# Konversi ke DataFrame
-df_golden = pd.DataFrame(word_counts.items(), columns=['Kata Asli', 'Jumlah'])
-
-# Urutkan berdasarkan jumlah terbanyak
-df_golden = df_golden.sort_values(by='Jumlah', ascending=False).reset_index(drop=True)
-
-# Simpan ke file Excel
-df_golden.to_excel('not_stemmed.xlsx', index=False)
-
-print(f"Golden standard disimpan sebagai 'not_stemmed.xlsx' dengan total {len(df_golden)} kata unik.")
-
-# %%
+print(f'Hasil stemming telah disimpan di: hasil_stemming.csv')
