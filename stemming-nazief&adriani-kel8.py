@@ -1,322 +1,115 @@
-#%%
-import numpy as np
-import pandas as pd
+#%% Import Librray
 import re
 from collections import Counter
+from itertools import combinations
+from statistics import mean
 
-# %% Tokenizing
+#%% Tokenizing
 def tokenizing(text):
-    text = re.sub(r'[^\w\s]', ' ', text)  # Ganti semua tanda baca dengan spasi
+    text = re.sub(r'[^\w\s]', ' ', text)
     return text
 
-#%% Stopword
-def stop_word(word):
-    with open('stopwords-id.txt', encoding='utf-8') as f:
-        s_word = f.read().splitlines()
-    if word not in s_word:
+#%% Menghapus Stopwords
+stopwords = set()
+
+def load_stopwords(file_path='stopwords-id.txt'):
+    global stopwords
+    with open(file_path, encoding='utf-8') as f:
+        stopwords = set(word.strip().lower() for word in f if word.strip())
+
+def remove_stopwords(tokens):
+    return [word for word in tokens if word not in stopwords]
+
+#%% Load Kamus Kata Dasar
+kamus_kata_dasar = set()
+
+def load_kamus(file_path='kata-dasar.txt'):
+    global kamus_kata_dasar
+    with open(file_path, encoding='utf-8') as f:
+        kamus_kata_dasar = set(word.strip().lower() for word in f if word.strip())
+
+#%% Mengganti Suffix dan Prefix
+def simple_stem(word):
+    if word in kamus_kata_dasar:
         return word
-    return None
 
-#%% LKamus Kata Dasar
-AKAR_KATA = []
-kamus_clean = []
-def load_dictionary():
-    global kamus_clean
-    with open('kata-dasar.txt', encoding='utf-8') as f:
-        content = f.read()
-        content = re.sub(r'[^\w\s]', ' ', content)
-        words = re.findall(r'\b\w+\b', content.lower())
-        kamus_clean = [w for w in words if w]
+    for suf in ['lah', 'kah', 'pun', 'ku', 'mu', 'nya', 'kan', 'an', 'i']:
+        if word.endswith(suf):
+            base = word[:-len(suf)]
+            if base in kamus_kata_dasar:
+                return base
+            word = base
 
-load_dictionary()
+    for pre in ['meng', 'meny', 'men', 'mem', 'me', 'peng', 'peny', 'pen', 'pem', 'pe', 'ber', 'be', 'ter', 'se', 'di', 'ke']:
+        if word.startswith(pre):
+            base = word[len(pre):]
+            if base in kamus_kata_dasar:
+                return base
 
-def kamus_word(word):
-    global AKAR_KATA
-    if not word:
-        return None
-    
-    if word in kamus_clean:
-        if word not in AKAR_KATA:
-            AKAR_KATA.append(word)
-        return None
     return word
 
-#%% Stemming 
-def hapus_infleksional_suffiks(word):
-    # akhiran -lah, -kah, -nya, -tah, -pun
-    if word.endswith('lah') or word.endswith('kah') or word.endswith('nya') or word.endswith('tah') or word.endswith('pun'):
-        word = word[0:len(word) - 3]
-        word_check = kamus_word(word)
-        return word_check
+#%% Stemming
+def proses_stemming(input_file='dokumen Bahasa Indonesia.txt', output_file='hasil_stemming.txt'):
+    with open(input_file, encoding='utf-8', errors='ignore') as f:
+        text = f.read()
+        processed_text = tokenizing(text)
+        tokens = processed_text.split()
+        tokens = remove_stopwords(tokens)
+        stems = [simple_stem(word) for word in tokens]
 
-    # akhiran -ku, -mu
-    elif word.endswith('ku') or word.endswith('mu'):
-        word = word[0:len(word) - 2]
-        word_check = kamus_word(word)
-        return word_check
-    
-    return word
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(' '.join(stems))
+    print(f"Hasil stemming disimpan ke {output_file}")
+    return tokens, stems
 
-def hapus_derivation_suffiks(word):
-    # akhiran kan
-    if word.endswith('kan'):
-        word = word[0:len(word) - 3]
-        word_check = kamus_word(word)
-        return word_check
+# Golden Standard
+def golden_standard(tokens, stems, output_file='golden_standard.csv'):
+    pairs = []
+    for original, stem in zip(tokens, stems):
+        pairs.append((original, stem))
 
-    # akhiran i
-    if word.endswith('i'):
-        word = word[0:len(word) - 1]
-        word_check = kamus_word(word)
-        return word_check
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write('kata_asli,kata_stemmed\n')
+        for word, stem in pairs:
+            f.write(f'{word},{stem}\n')
+    print(f"✓ Golden standard disimpan ke {output_file}")
+    return pairs
 
-    # akhiran an
-    if word.endswith('an'):
-        word = word[0:len(word) - 2]
-        word_check = kamus_word(word)
-        return word_check
-    
-    return word
+#%% Evaluasi Menggunakan UI, OI, dan MWC
+def evaluasi_stemming(golden_standard, original_tokens, hasil_stem):
+    # Menghitung UI
+    N_total_ui = len(golden_standard)
+    N_under = 0
+    for w1, w2 in golden_standard:
+        if simple_stem(w1) != simple_stem(w2):
+            N_under += 1
+    UI = N_under / N_total_ui if N_total_ui else 0
 
-def hapus_derivation_prefiks(word):
-    # awalan mempel-
-    if (word.startswith('mempel')) and (len(word) > 6):
-        sub_word = word[6:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
+    # Menghitung OI
+    N_total_oi = len(golden_standard)
+    N_over = 0
+    for w1, w2 in golden_standard:
+        if simple_stem(w1) == simple_stem(w2):
+            N_over += 1
+    OI = N_over / N_total_oi if N_total_oi else 0
 
-    # awalan memper-
-    if (word.startswith('memper')) and (len(word) > 6):
-        sub_word = word[6:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
+    # Menghitung MWC
+    N_total = len(original_tokens)
+    roots = set([simple_stem(w) for w in original_tokens])
+    N_roots = len(roots)
+    MWC = N_total / N_roots if N_roots else 0
 
-    # awalan diper-, keber-, keter-
-    if (word.startswith('diper') or word.startswith('keber') or word.startswith('keter')) and (len(word) > 5):
-        sub_word = word[5:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
+    return UI, OI, MWC
 
-    # awalan meng-, peng-
-    if (word.startswith('meng') or word.startswith('peng')) and (len(word) > 4):
-        sub_word = word[4:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            if word_check != None:
-                sub_word = 'k' + word_check
-                word_check = kamus_word(sub_word)
-                if word_check != None:
-                    word_pref_suff_k = hapus_derivation_suffiks(word_check)
-                    word_check = kamus_word(word_pref_suff_k)
-                    return word_check
-        return word_check
+#%% Main
+if __name__ == "__main__":
+    load_kamus()
+    load_stopwords()
+    tokens_asli, hasil_stem = proses_stemming()
+    golden_standard = golden_standard(tokens_asli, hasil_stem)
 
-    # awalan meny-, peny-
-    if (word.startswith('meny') or word.startswith('peny')) and (len(word) > 4):
-        sub_word = word[4:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:  
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            if word_check != None:  
-                # add 's' in front word
-                sub_word = 's' + word_check
-                word_check = kamus_word(sub_word)
-                if word_check != None:  
-                    word_pref_suff_s = hapus_derivation_suffiks(word_check)
-                    word_check = kamus_word(word_pref_suff_s)
-                    return word_check
-        return word_check
-
-    # awalan mel-, mer-, pel-, per-
-    if (word.startswith('mel') or word.startswith('mer') or word.startswith('pel') or word.startswith('per')) and (len(word) > 3):
-        sub_word = word[3:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:  
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
-
-    # awalan men-, pen-
-    if (word.startswith('men') or word.startswith('pen')) and (len(word) > 3):
-        sub_word = word[3:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:  
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            if word_check != None:  
-                # add 't' in front word
-                sub_word = 't' + word_check
-                word_check = kamus_word(sub_word)
-                if word_check != None:  
-                    word_pref_suff_t = hapus_derivation_suffiks(word_check)
-                    word_check = kamus_word(word_pref_suff_t)
-                    return word_check
-        return word_check
-    
-    # awalan mem-, pem-
-    if (word.startswith('mem') or word.startswith('pem')) and (len(word) > 3):
-        sub_word = word[3:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:  
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            if word_check != None:  
-                # add 'p' in front word
-                sub_word = 'p' + word_check
-                word_check = kamus_word(sub_word)
-                if word_check != None:
-                    word_pref_suff_p = hapus_derivation_suffiks(word_check)
-                    word_check = kamus_word(word_pref_suff_p)
-                    return word_check
-        return word_check
-
-    # awalan bel-, ber-, tel-, ter-
-    if (word.startswith('bel') or word.startswith('ber') or word.startswith('tel') or word.startswith('ter')) and (len(word) > 3):
-        sub_word = word[3:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
-
-    # awalan di-, ke-, se-
-    if (word.startswith('di') or word.startswith('ke') or word.startswith('se')) and (len(word) > 2):
-        sub_word = word[2:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
-
-    # awalan be-, te-
-    if (word.startswith('be') or word.startswith('te')) and (len(word) > 2):
-        sub_word = word[2:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:  
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
-
-    # awalan me-, pe-
-    if (word.startswith('me') or word.startswith('pe')) and (len(word) > 2):
-        sub_word = word[2:]
-        word_check = kamus_word(sub_word)
-        if word_check != None:
-            word_pref_suff = hapus_derivation_suffiks(word_check)
-            word_check = kamus_word(word_pref_suff)
-            return word_check
-        return word_check
-    
-    # Direct dictionary check as a last resort
-    if word in kamus_clean and word not in AKAR_KATA:
-        AKAR_KATA.append(word)
-        return None
-    
-    return word
-
-#%% MAIN
-df = pd.read_excel('ArtikelBhsIndo.xlsx')
-words = ' '.join(df['Isi'].astype(str).tolist())
-
-words = words.lower()
-words = tokenizing(words)
-
-all_words = words.split()
-print(f'Jumlah kata awal : {len(all_words)}')
-
-list_stop_words = []
-for w in all_words:
-    word = stop_word(w)
-    if word is not None:
-        list_stop_words.append(word)
-print(f'Jumlah kata setelah stop word : {len(list_stop_words)}')
-
-for word in list_stop_words:
-    if word in kamus_clean:
-        if word not in AKAR_KATA:
-            AKAR_KATA.append(word)
-
-list_not_in_kamus_words = []
-for w in list_stop_words:
-    if w not in kamus_clean:
-        list_not_in_kamus_words.append(w)
-
-print(f'Jumlah kata setelah kamus : {len(list_not_in_kamus_words)}')
-print(f'Akar kata : {len(AKAR_KATA)}')
-
-list_not_infleksional_suffiks = []
-for w in list_not_in_kamus_words:
-    word = hapus_infleksional_suffiks(w)
-    if word is not None:
-        list_not_infleksional_suffiks.append(word)
-
-print(f'Jumlah kata setelah infleksional suffiks : {len(list_not_infleksional_suffiks)}')
-print(f'Akar kata : {len(AKAR_KATA)}')
-
-list_not_derivation_suffiks = []
-for w in list_not_infleksional_suffiks:
-    word = hapus_derivation_suffiks(w)
-    if word is not None:
-        list_not_derivation_suffiks.append(word)
-
-print(f'Jumlah kata setelah derivation suffiks : {len(list_not_derivation_suffiks)}')
-print(f'Akar kata : {len(AKAR_KATA)}')
-
-list_not_in_kamus = []
-for w in list_not_derivation_suffiks:
-    word = hapus_derivation_prefiks(w)
-    if word is not None:
-        list_not_in_kamus.append(word)
-
-print(f'Jumlah kata setelah derivation prefiks : {len(list_not_in_kamus)}')
-print(f'Akar kata : {len(AKAR_KATA)}')
-
-for w in list_not_in_kamus:
-    if w in kamus_clean and w not in AKAR_KATA:
-        AKAR_KATA.append(w)
-
-print(f'Final akar kata : {len(AKAR_KATA)}')
-print(f'Kata yang tak ada di kamus: {len(list_not_in_kamus)}')
-print(f"Kata yang tidak ada dikamus: {list_not_in_kamus}")
-
-#%% Membuat DataFrame untuk menyimpan hasil stemming
-import pandas as pd
-
-# Data untuk menyimpan kata awal dan kata stemming
-hasil_stemming = []
-
-# Proses stemming untuk setiap kata dan simpan hasilnya
-for w in list_not_in_kamus:
-    word = hapus_derivation_prefiks(w)
-    if word is not None:
-        hasil_stemming.append({'kata_awal': w, 'kata_stemming': word})
-
-# Membuat DataFrame dari hasil stemming
-df_stemming = pd.DataFrame(hasil_stemming)
-
-# Menyimpan DataFrame ke dalam file CSV
-df_stemming.to_csv('hasil_stemming.csv', index=False, encoding='utf-8')
-
-# Jika ingin menyimpan dalam format Excel
-# df_stemming.to_excel('hasil_stemming.xlsx', index=False, encoding='utf-8')
-
-print(f'Hasil stemming telah disimpan di: hasil_stemming.csv')
+    ui, oi, mwc = evaluasi_stemming(golden_standard, tokens_asli, hasil_stem)
+    print("\n--- HASIL EVALUASI ---")
+    print(f"Under-stemming Index (UI): {ui:.4f}")
+    print(f"Over-stemming Index (OI): {oi:.4f}")
+    print(f"Mean Word Conflation (MWC): {mwc:.4f}")
