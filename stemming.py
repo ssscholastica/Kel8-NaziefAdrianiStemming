@@ -6,7 +6,7 @@ from collections import Counter
 
 # %% Tokenizing
 def tokenizing(text):
-    text = re.sub(r'[^\w\s]', ' ', text)  # Ganti semua tanda baca dengan spasi
+    text = re.sub(r'[^\w\s]', ' ', text)
     return text
 
 #%% Stopword
