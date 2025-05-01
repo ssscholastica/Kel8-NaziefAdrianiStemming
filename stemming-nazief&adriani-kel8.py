@@ -2,26 +2,11 @@
 import numpy as np
 import pandas as pd
 import re
-from collections import Counter
 
-# %%
-def tokenizing(input):
-    input = input.replace(".", "")
-    input = input.replace(",", "")
-    input = input.replace(":", "")
-    input = input.replace("-", " ")
-    input = input.replace("?", "")
-    input = input.replace("!", "")
-    input = input.replace("(", "")
-    input = input.replace(")", "")
-    input = input.replace("[", "")
-    input = input.replace("]", "")
-    input = input.replace("{", "")
-    input = input.replace("}", "")
-    input = input.replace("'", "")
-    input = input.replace('"', "")
-    input = input.replace("/", "")
-    return input
+#%% Tokenizing
+def tokenizing(text):
+    text = re.sub(r'[^\w\s]', ' ', text)
+    return text
 
 #%% Stopword
 def stop_word(word):
@@ -57,7 +42,6 @@ def kamus_word(word):
 
 #%% Stemming functions
 def hapus_infleksional_suffiks(word):
-    """Remove inflectional suffixes"""
     # akhiran -lah, -kah, -nya, -tah, -pun
     if word.endswith('lah') or word.endswith('kah') or word.endswith('nya') or word.endswith('tah') or word.endswith('pun'):
         word = word[0:len(word) - 3]
@@ -73,7 +57,6 @@ def hapus_infleksional_suffiks(word):
     return word
 
 def hapus_derivation_suffiks(word):
-    """Remove derivational suffixes"""
     # akhiran kan
     if word.endswith('kan'):
         word = word[0:len(word) - 3]
@@ -104,7 +87,7 @@ def hapus_derivation_prefiks(word):
             word_check = kamus_word(word_pref_suff)
             return word_check
         return word_check
-  
+
     # awalan memper-
     if (word.startswith('memper')) and (len(word) > 6):
         sub_word = word[6:]
@@ -249,33 +232,6 @@ def hapus_derivation_prefiks(word):
     
     return word
 
-#%% Metrics calculation
-def calculate_metrics(all_words, stemmed_words):
-    # Count total words
-    total_words = len(all_words)
-    
-    # Count unique words
-    unique_words = len(set(all_words))
-    
-    # Calculate UI (User Interface)
-    UI = unique_words / total_words if total_words > 0 else 0
-    
-    # Calculate OI (Object Identification)
-    recognized_words = len(stemmed_words)
-    OI = recognized_words / unique_words if unique_words > 0 else 0
-    
-    # Calculate MWC (Modified Word Count)
-    MWC = unique_words + recognized_words
-    
-    return {
-        'UI': UI,
-        'OI': OI,
-        'MWC': MWC,
-        'total_words': total_words,
-        'unique_words': unique_words,
-        'recognized_words': recognized_words
-    }
-
 #%% MAIN
 # Load data
 df = pd.read_excel('ArtikelBhsIndo.xlsx')
@@ -351,11 +307,42 @@ print(f'Final akar kata : {len(AKAR_KATA)}')
 print(f'Kata yang tak ada di kamus: {len(list_not_in_kamus)}')
 print(f"Kata yang tidak ada dikamus: {list_not_in_kamus}")
 
-# Calculate UI, OI, and MWC metrics
-metrics = calculate_metrics(all_words, AKAR_KATA)
-print(f"UI (User Interface): {metrics['UI']:.4f}")
-print(f"OI (Object Identification): {metrics['OI']:.4f}")
-print(f"MWC (Modified Word Count): {metrics['MWC']}")
-print(f"Total Words: {metrics['total_words']}")
-print(f"Unique Words: {metrics['unique_words']}")
-print(f"Recognized Words: {metrics['recognized_words']}")
+#%%
+df_akar_kata = pd.DataFrame({'Akar Kata': AKAR_KATA})
+
+# Menyimpan ke file Excel
+output_filename = 'hasil_stemming.xlsx'
+df_akar_kata.to_excel(output_filename, index=False)
+
+print(f"Hasil stemming telah disimpan di '{output_filename}'")
+
+# # Calculate UI, OI, and MWC metrics
+# metrics = calculate_metrics(all_words, AKAR_KATA)
+# print(f"UI (User Interface): {metrics['UI']:.4f}")
+# print(f"OI (Object Identification): {metrics['OI']:.4f}")
+# print(f"MWC (Modified Word Count): {metrics['MWC']}")
+# print(f"Total Words: {metrics['total_words']}")
+# print(f"Unique Words: {metrics['unique_words']}")
+# print(f"Recognized Words: {metrics['recognized_words']}")
+
+#%% Ekstraksi kata sebelum stemming dan simpan sebagai golden standard
+from collections import Counter
+
+# Pecah teks menjadi kata-kata
+original_words = words.split()
+
+# Hitung frekuensi setiap kata
+word_counts = Counter(original_words)
+
+# Konversi ke DataFrame
+df_golden = pd.DataFrame(word_counts.items(), columns=['Kata Asli', 'Jumlah'])
+
+# Urutkan berdasarkan jumlah terbanyak
+df_golden = df_golden.sort_values(by='Jumlah', ascending=False).reset_index(drop=True)
+
+# Simpan ke file Excel
+df_golden.to_excel('not_stemmed.xlsx', index=False)
+
+print(f"Golden standard disimpan sebagai 'not_stemmed.xlsx' dengan total {len(df_golden)} kata unik.")
+
+# %%
